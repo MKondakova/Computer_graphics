@@ -8,6 +8,13 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
+type point struct {
+	x float32
+	y float32
+}
+
+var points []point
+
 const SIZE = 600
 
 func closeWindowCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
@@ -21,17 +28,14 @@ func drowPoint(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mod 
 	if button == glfw.MouseButtonLeft && action == glfw.Press {
 		x, y := w.GetCursorPos()
 		log.Println((x/SIZE-0.5)*2, -2*(y/SIZE-0.5), " :mouse")
-		gl.PointSize(10)
-		gl.Begin(gl.POINTS)
-		gl.Color3d(116/125, 185/125, 255/125)
-		gl.Vertex2d((x/SIZE-0.5)*2, -2*(y/SIZE-0.5))
-		gl.End()
+		points = append(points, point{float32(x/SIZE-0.5) * 2, -2 * float32(y/SIZE-0.5)})
+
 	}
 }
 
 func clearScene(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
 	if button == glfw.MouseButtonRight && action == glfw.Press {
-		gl.Clear(gl.COLOR_BUFFER_BIT)
+		points = []point{}
 		log.Println("CLEAR!!")
 	}
 }
@@ -43,7 +47,15 @@ func mouseCallback(w *glfw.Window, button glfw.MouseButton, action glfw.Action, 
 
 func makePointPool() {
 
-	//gl.Clear(gl.COLOR_BUFFER_BIT)
+	gl.Clear(gl.COLOR_BUFFER_BIT)
+
+	gl.PointSize(10)
+	gl.Begin(gl.POINTS)
+	gl.Color3d(116/125, 185/125, 255/125)
+	for _, p := range points {
+		gl.Vertex2f(p.x, p.y)
+	}
+	gl.End()
 
 	gl.Begin(gl.TRIANGLES)
 	gl.Color3f(71/125, 38/125, 134/125)
@@ -70,7 +82,6 @@ func initWindow() *glfw.Window {
 }
 
 func main() {
-
 	runtime.LockOSThread()
 
 	if err := glfw.Init(); err != nil {
@@ -81,7 +92,7 @@ func main() {
 	window := initWindow()
 
 	if err := gl.Init(); err != nil {
-		panic(err)
+		log.Fatalln("failed to initialize gl:", err)
 	}
 
 	window.SetKeyCallback(glfw.KeyCallback(closeWindowCallback))
