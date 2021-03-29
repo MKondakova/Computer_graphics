@@ -14,5 +14,7 @@ glPolygonMode).
 
 __Вариант__: правильная призма (n=9, но можно ввести произвольное), изометрическая проекция
 
-https://github.com/inkyblackness/imgui-go
-https://blog.conan.io/2019/06/26/An-introduction-to-the-Dear-ImGui-library.html
+## Полезные ссылки
+Библиотека для управления параметрами: 
+- https://github.com/inkyblackness/imgui-go
+- https://blog.conan.io/2019/06/26/An-introduction-to-the-Dear-ImGui-library.html
