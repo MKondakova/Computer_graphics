@@ -9,7 +9,7 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
-const SIZE = 600
+const SIZE = 1000
 const HEIGHT = 0.5
 
 var isometricProjectionMatrix []float64 = []float64{
@@ -32,9 +32,10 @@ var (
 	scale          float64 = 1
 	setProjection  bool    = false
 	setPolygonMode bool    = false
+	CORNERS        int     = 6
 )
 
-func drowBase(vertexes [][2]float64, z float64) {
+func drawBase(vertexes [][2]float64, z float64) {
 
 	gl.Begin(gl.POLYGON)
 	gl.Color3d(z, 1, 1)
@@ -44,7 +45,7 @@ func drowBase(vertexes [][2]float64, z float64) {
 	gl.End()
 }
 
-func drowSideFaces(vertexes [][2]float64, height float64) {
+func drawSideFaces(vertexes [][2]float64, height float64) {
 	for i := 0; i < len(vertexes); i++ {
 		gl.Begin(gl.QUADS)
 		gl.Color3d(0.2, 0.2, float64(i)/3)
@@ -57,7 +58,7 @@ func drowSideFaces(vertexes [][2]float64, height float64) {
 
 }
 
-func drowPrism(n int) {
+func drawPrism(n int) {
 	vertexes := [][2]float64{}
 	for i := 0; i < n; i++ {
 		vertexes = append(vertexes, [2]float64{
@@ -65,17 +66,39 @@ func drowPrism(n int) {
 			RADIUS * math.Sin(2*math.Pi*float64(i)/float64(n)+math.Pi*45/180),
 		})
 	}
-	drowBase(vertexes, HEIGHT/-2)
-	drowBase(vertexes, HEIGHT/2)
-	drowSideFaces(vertexes, HEIGHT)
+	drawBase(vertexes, HEIGHT/-2)
+	drawBase(vertexes, HEIGHT/2)
+	drawSideFaces(vertexes, HEIGHT)
 }
 
 func closeWindowCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 	if key == glfw.KeyEscape && action == glfw.Press {
-		log.Print("ESC")
+		log.Println("ESC")
 		w.SetShouldClose(true)
 	}
 }
+
+func changeNumberOfCorners(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	if action == glfw.Press {
+		if key == glfw.KeyMinus {
+			if CORNERS != 3 {
+				CORNERS -= 1
+			}
+		}
+		if key == glfw.KeyEqual {
+			if CORNERS < 100 {
+				CORNERS += 1
+			}
+		}
+		log.Println(CORNERS)
+	}
+}
+
+func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	closeWindowCallback(w, key, scancode, action, mods)
+	changeNumberOfCorners(w, key, scancode, action, mods)
+}
+
 func makeProjection(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
 	if button == glfw.MouseButtonLeft && action == glfw.Press {
 		if setProjection == true {
@@ -126,6 +149,7 @@ func mouseScrollCallback(w *glfw.Window, xoff float64, yoff float64) {
 }
 
 func initWindow() *glfw.Window {
+	glfw.WindowHint(glfw.Resizable, glfw.False)
 	glfw.WindowHint(glfw.ContextVersionMajor, 2)
 	glfw.WindowHint(glfw.ContextVersionMinor, 0)
 	window, err := glfw.CreateWindow(SIZE, SIZE, "LAB_2/3", nil, nil)
@@ -151,7 +175,7 @@ func main() {
 		log.Fatalln("failed to initialize gl:", err)
 	}
 
-	window.SetKeyCallback(glfw.KeyCallback(closeWindowCallback))
+	window.SetKeyCallback(glfw.KeyCallback(keyCallback))
 	window.SetCursorPosCallback(glfw.CursorPosCallback(mouseCursorCallback))
 	window.SetScrollCallback(glfw.ScrollCallback(mouseScrollCallback))
 	window.SetMouseButtonCallback(glfw.MouseButtonCallback(mouseCallback))
@@ -181,16 +205,16 @@ func main() {
 		gl.Viewport(0, 0, int32(width), int32(height))
 		gl.Ortho(-1*aspect, aspect, -1, 1, 1.0, -1.0)
 
-		gl.Translated(-0.6, -0.6, 0)
-		drowPrism(4)
+		gl.Translated(-0.4, -0.4, 0)
+		drawPrism(4)
 
 		gl.PushMatrix()
 
-		gl.Translated(0.6, 0.6, 0)
+		gl.Translated(0.8, 0.8, 0)
 		gl.Rotated(yaw, 0, 1, 0)
 		gl.Rotated(pitch, 1, 0, 0)
 		gl.Scaled(scale, scale, scale)
-		drowPrism(10)
+		drawPrism(CORNERS)
 
 		gl.PopMatrix()
 
