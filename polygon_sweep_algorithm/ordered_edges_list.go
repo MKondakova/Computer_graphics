@@ -22,6 +22,10 @@ type point struct {
 	x float64
 	y float64
 }
+type line struct {
+	y float64
+	x []float64
+}
 
 var (
 	mouse      point
@@ -31,6 +35,7 @@ var (
 	sizeY      int
 	pixels     []uint8
 	tempPixels []uint8
+	list       map[float64]line
 	edges      [][2]point
 )
 
@@ -44,9 +49,36 @@ func makeEdges() {
 		edges[i] = [2]point{p, nextP}
 	}
 }
+func eqVertex(v1, v2 point) bool {
+	return v1.x == v2.x && v1.y == v2.y
+}
+func vertexCountTwice(i, j int) bool {
+	vertex := edges[i][j]
+	fDiffVertex := edges[i][(j+1)%2]
+	var sDiffVertex point
+	if eqVertex(edges[(i+1)%len(edges)][0], vertex) {
+		sDiffVertex = edges[(i+1)%len(edges)][1]
+	}
+	if eqVertex(edges[(i+1)%len(edges)][1], vertex) {
+		sDiffVertex = edges[(i+1)%len(edges)][1]
+
+	}
+	if eqVertex(edges[(len(edges)-(i-1))%len(edges)][0], vertex) {
+		sDiffVertex = edges[(i+1)%len(edges)][1]
+
+	}
+	if eqVertex(edges[(len(edges)-i+1)%len(edges)][1], vertex) {
+		sDiffVertex = edges[(i+1)%len(edges)][1]
+	}
+	if (vertex.y > fDiffVertex.y && vertex.y > sDiffVertex.y) ||
+		(vertex.y < fDiffVertex.y && vertex.y < sDiffVertex.y) {
+		return true
+	}
+	return false
+}
 
 func DDA() {
-	for _, edge := range edges {
+	for i, edge := range edges {
 		dx := edge[1].x - edge[0].x
 		x := edge[0].x
 		dy := edge[1].y - edge[0].y
@@ -55,8 +87,13 @@ func DDA() {
 		dy = dy / counter
 		dx = dx / counter
 		for i := float64(0); i < counter; i++ {
-			pixels[int(math.Floor(float64(sizeY)-(y+i*dy)))*sizeX+int(math.Floor(x+i*dx))] = 255
-
+			list[int(math.Round(float64(sizeY)-(y+i*dy)))] = int(math.Round(x + i*dx))
+		}
+		if !vertexCountTwice(i, 1) {
+			list[int(math.Round(edge[1].y))] = int(math.Round(edge[1].x))
+		}
+		if !vertexCountTwice(i, 0) {
+			list[int(math.Round(edge[0].y))] = int(math.Round(edge[0].x))
 		}
 	}
 }
@@ -85,6 +122,7 @@ func fill() {
 
 func rasterisation() {
 	pixels = make([]uint8, sizeY*sizeX)
+	list = make(map[int]int)
 	makeEdges()
 	DDA()
 	fill()
