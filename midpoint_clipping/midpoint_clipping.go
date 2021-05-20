@@ -80,7 +80,7 @@ func midpointClipping(segment [2]point, count int) {
 		}
 	}
 }
-
+	
 func getCode(p point) int {
 	code := 0
 	if p.y > zoneFloor {
