@@ -36,7 +36,16 @@ var (
 
 	isLightMoving bool = true
 
-	ticker *time.Ticker = time.NewTicker(50 * time.Millisecond)
+	rotateTicker *time.Ticker = time.NewTicker(50 * time.Millisecond)
+
+	t              float64      = 0.0
+	curveTicker    *time.Ticker = time.NewTicker(50 * time.Millisecond)
+	animationSpeed float64      = 0.01
+	phase          int          = 0
+
+	POINT1 []float64 = []float64{0, 0.6, 0}
+	POINT2 []float64 = []float64{0.6, 0.6, 0}
+	POINT3 []float64 = []float64{0.6, 0, 0}
 )
 
 func drawBase(vertexes [][2]float64, normals [][3]float64, z float64) {
@@ -99,6 +108,14 @@ func drawPrism(n int) {
 	drawSideFaces(vertexes, normals, HEIGHT)
 }
 
+func getBezierPosition(t float64, p1, p2, p3 float64) float64 {
+	t -= math.Floor(t)
+	if t > 0 {
+		return (1-t)*(1-t)*p1 + 2*t*(1-t)*p2 + t*t*p3
+	}
+	return 0
+}
+
 func drawMovingPrism() {
 	gl.PushMatrix()
 
@@ -108,6 +125,21 @@ func drawMovingPrism() {
 	drawPrism(CORNERS)
 
 	gl.PopMatrix()
+
+	gl.Begin(gl.POINTS)
+
+	gl.PointSize(5)
+	gl.Vertex3dv(&POINT1[0])
+	gl.Vertex3dv(&POINT2[0])
+	gl.Vertex3dv(&POINT3[0])
+
+	gl.PointSize(10)
+	gl.Vertex3d(
+		getBezierPosition(t, POINT1[0], POINT2[0], POINT3[0]),
+		getBezierPosition(t, POINT1[1], POINT2[1], POINT3[1]),
+		getBezierPosition(t, POINT1[2], POINT2[2], POINT3[2]))
+
+	gl.End()
 }
 
 func setLight() {
@@ -154,10 +186,10 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 		if key == glfw.KeySpace {
 			isLightMoving = !isLightMoving
 			if isLightMoving {
-				ticker = time.NewTicker(50 * time.Millisecond)
+				rotateTicker = time.NewTicker(50 * time.Millisecond)
+				rotate(rotateTicker)
 			} else {
 				alpha = 0
-				ticker.Stop()
 			}
 		}
 		if key == glfw.KeyMinus {
@@ -217,12 +249,19 @@ func mouseScrollCallback(w *glfw.Window, xoff float64, yoff float64) {
 	}
 }
 
-func rotate(ticker *time.Ticker) {
+func tick(ticker *time.Ticker, f func(), isEnd func() bool, stop chan bool) {
+	defer ticker.Stop()
+	defer log.Println(isEnd())
 	for {
 		select {
 		case <-ticker.C:
-			alpha = (alpha + 1)
-
+			if isEnd() {
+				stop <- true
+			}
+			f()
+		case t := <-stop:
+			log.Println(t, "stopped")
+			return
 		}
 	}
 }
@@ -238,6 +277,10 @@ func initWindow() *glfw.Window {
 
 	window.MakeContextCurrent()
 	return window
+}
+
+func rotate(ticker *time.Ticker) {
+	go tick(ticker, func() { alpha += 1 }, func() bool { return !isLightMoving }, make(chan bool, 1))
 }
 
 func main() {
@@ -265,10 +308,19 @@ func main() {
 	gl.Enable(gl.LIGHTING)
 	gl.Enable(gl.LIGHT0)
 
-	go rotate(ticker)
-
 	backLight := []float32{0.3, 0.3, 0.3, 1}
 	gl.LightModelfv(gl.LIGHT_MODEL_AMBIENT, &backLight[0])
+
+	rotate(rotateTicker)
+
+	go tick(curveTicker, func() {
+		t += float64(phase*-1*2+1) * animationSpeed
+		if t < 0 || t > 1 {
+			phase = (1 + phase) % 2
+			t += float64(phase*-1*2+1) * animationSpeed
+		}
+	},
+		func() bool { return false }, make(chan bool, 1))
 
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
