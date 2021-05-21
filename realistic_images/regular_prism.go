@@ -13,28 +13,30 @@ import (
 const SIZE = 1000
 const HEIGHT = 0.5
 
-var isometricProjectionMatrix []float64 = []float64{
-
-	math.Cos(phi), 0.0, math.Sin(phi), 0.0,
-	math.Sin(phi) * math.Sin(theta), math.Cos(theta), -1 * math.Cos(phi) * math.Sin(theta), 0.0,
-	math.Sin(phi) * math.Cos(theta), -1 * math.Sin(theta), -1 * math.Cos(phi) * math.Cos(theta), 0.0,
-	0.0, 0.0, 0.0, 1.0,
-}
-
 var (
-	alpha  float32 = 0
-	theta  float64 = 45 * math.Pi / 180.0
-	phi    float64 = 35.26 * math.Pi / 180.0
-	RADIUS float64 = math.Sqrt(0.5) * 0.5
+	RADIUS  float64 = math.Sqrt(0.5) * 0.5
+	CORNERS int     = 6
 
-	lastXpos       float64 = SIZE / 2
-	lastYpos       float64 = SIZE / 2
-	yaw            float64 = -90
-	pitch          float64 = 0
-	scale          float64 = 1
-	setProjection  bool    = false
-	setPolygonMode bool    = false
-	CORNERS        int     = 6
+	alpha    float32 = 0
+	lastXpos float64 = SIZE / 2
+	lastYpos float64 = SIZE / 2
+	yaw      float64 = -90
+	pitch    float64 = 0
+	scale    float64 = 1
+
+	setPolygonMode          bool = false
+	setInfinityDistantLight bool = false
+
+	ambientMode  int         = 0
+	ambient      [][]float32 = [][]float32{{0, 0, 0, 1}, {1, 1, 1, 0.5}, {1, 1, 1, 1}, {0.5, 0.5, 0.5, 1}, {0, 1, 0, 1}}
+	diffuseMode  int         = 0
+	diffuse      [][]float32 = [][]float32{{1, 1, 1, 1}, {0, 0, 0, 1}, {1, 1, 1, 0.5}, {0.5, 0.5, 0.5, 1}, {0, 1, 0, 1}}
+	specularMode int         = 0
+	specular     [][]float32 = [][]float32{{1, 1, 1, 1}, {0, 0, 0, 1}, {1, 1, 1, 0.5}, {0.5, 0.5, 0.5, 1}, {0, 1, 0, 1}}
+
+	isLightMoving bool = true
+
+	ticker *time.Ticker = time.NewTicker(50 * time.Millisecond)
 )
 
 func drawBase(vertexes [][2]float64, normals [][3]float64, z float64) {
@@ -55,7 +57,7 @@ func drawBase(vertexes [][2]float64, normals [][3]float64, z float64) {
 func drawSideFaces(vertexes [][2]float64, normals [][3]float64, height float64) {
 	for i := 0; i < len(vertexes); i++ {
 		gl.Begin(gl.QUADS)
-		gl.Color3d(0.2, 0.2, float64(i)/3)
+		gl.Color3d(0.5, 0.2, 0.5)
 		gl.Normal3d(normals[i+len(vertexes)][0], normals[i+len(vertexes)][1], normals[i+len(vertexes)][2])
 		gl.Vertex3d(vertexes[i][0], vertexes[i][1], height/-2)
 
@@ -97,32 +99,85 @@ func drawPrism(n int) {
 	drawSideFaces(vertexes, normals, HEIGHT)
 }
 
-func closeWindowCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-	if key == glfw.KeyEscape && action == glfw.Press {
-		log.Println("ESC")
-		w.SetShouldClose(true)
-	}
+func drawMovingPrism() {
+	gl.PushMatrix()
+
+	gl.Rotated(yaw, 0, 1, 0)
+	gl.Rotated(pitch, 1, 0, 0)
+	gl.Scaled(scale, scale, scale)
+	drawPrism(CORNERS)
+
+	gl.PopMatrix()
 }
 
-func changeNumberOfCorners(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+func setLight() {
+	gl.PushMatrix()
+	gl.Rotatef(alpha+150, 0, 1, 0)
+	position := []float32{0, 0, 1, 1}
+	if setInfinityDistantLight {
+		position[3] = 0
+	}
+	gl.Lightfv(gl.LIGHT0, gl.POSITION, &position[0])
+	gl.Lightfv(gl.LIGHT0, gl.AMBIENT, &ambient[ambientMode][0])
+	gl.Lightfv(gl.LIGHT0, gl.DIFFUSE, &diffuse[diffuseMode][0])
+	gl.Lightfv(gl.LIGHT0, gl.SPECULAR, &specular[specularMode][0])
+
+	gl.Color3d(1, 1, 1)
+	gl.PointSize(10)
+	gl.Normal3b(0, 0, 1)
+
+	gl.Begin(gl.POINTS)
+	gl.Vertex3d(0, 0, 0.7)
+	gl.End()
+
+	gl.PopMatrix()
+
+}
+
+func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 	if action == glfw.Press {
+		if key == glfw.KeyI {
+			setInfinityDistantLight = !setInfinityDistantLight
+		}
+		if key == glfw.KeyA {
+			ambientMode = (ambientMode + 1) % len(ambient)
+			log.Println("ambient: ", ambient[ambientMode])
+		}
+		if key == glfw.KeyD {
+			diffuseMode = (diffuseMode + 1) % len(diffuse)
+			log.Println("diffuse: ", diffuse[diffuseMode])
+		}
+		if key == glfw.KeyS {
+			specularMode = (specularMode + 1) % len(specular)
+			log.Println("specular: ", specular[specularMode])
+		}
+		if key == glfw.KeySpace {
+			isLightMoving = !isLightMoving
+			if isLightMoving {
+				ticker = time.NewTicker(50 * time.Millisecond)
+			} else {
+				alpha = 0
+				ticker.Stop()
+			}
+		}
 		if key == glfw.KeyMinus {
 			if CORNERS != 3 {
 				CORNERS -= 1
 			}
+			log.Println(CORNERS)
 		}
 		if key == glfw.KeyEqual {
 			if CORNERS < 100 {
 				CORNERS += 1
 			}
+			log.Println(CORNERS)
 		}
-		log.Println(CORNERS)
+		if key == glfw.KeyEscape {
+			log.Println("ESC")
+			w.SetShouldClose(true)
+		}
 	}
-}
 
-func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-	closeWindowCallback(w, key, scancode, action, mods)
-	changeNumberOfCorners(w, key, scancode, action, mods)
 }
 
 func makeModePolygon(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
@@ -205,16 +260,15 @@ func main() {
 	window.SetMouseButtonCallback(glfw.MouseButtonCallback(mouseCallback))
 
 	gl.Enable(gl.DEPTH_TEST)
-
 	gl.Enable(gl.NORMALIZE)
-
+	gl.Enable(gl.COLOR_MATERIAL)
 	gl.Enable(gl.LIGHTING)
 	gl.Enable(gl.LIGHT0)
-	//backLight := []float32{1, 1, 1, 1}
-	//gl.LightModelfv(gl.LIGHT_MODEL_AMBIENT, &backLight[0])
 
-	ticker := time.NewTicker(50 * time.Millisecond)
 	go rotate(ticker)
+
+	backLight := []float32{0.3, 0.3, 0.3, 1}
+	gl.LightModelfv(gl.LIGHT_MODEL_AMBIENT, &backLight[0])
 
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -229,36 +283,11 @@ func main() {
 		width, height := window.GetSize()
 		gl.Viewport(0, 0, int32(width), int32(height))
 
-		gl.PushMatrix()
+		drawMovingPrism()
 
-		gl.Rotatef(60, 1, 0, 0.5)
+		setLight()
 
-		gl.PushMatrix()
-
-		gl.Rotated(yaw, 0, 1, 0)
-		gl.Rotated(pitch, 1, 0, 0)
-		gl.Scaled(scale, scale, scale)
-		drawPrism(CORNERS)
-
-		gl.PopMatrix()
-
-		gl.PushMatrix()
-		gl.Rotatef(alpha, 0, 1, 0)
-		position := []float32{0, 0, 1, 0}
-		gl.Lightfv(gl.LIGHT0, gl.POSITION, &position[0])
-
-		gl.Color3d(1, 1, 1)
-		gl.PointSize(10)
-		gl.Normal3b(0, 0, 1)
-		gl.Begin(gl.POINTS)
-		gl.Vertex3d(0, 0, 0.7)
-		gl.End()
-
-		gl.PopMatrix()
-
-		gl.PopMatrix()
-
-		glfw.WaitEvents()
+		glfw.PollEvents()
 		window.SwapBuffers()
 	}
 
