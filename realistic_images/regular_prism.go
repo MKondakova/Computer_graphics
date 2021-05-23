@@ -251,7 +251,6 @@ func mouseScrollCallback(w *glfw.Window, xoff float64, yoff float64) {
 
 func tick(ticker *time.Ticker, f func(), isEnd func() bool, stop chan bool) {
 	defer ticker.Stop()
-	defer log.Println(isEnd())
 	for {
 		select {
 		case <-ticker.C:
@@ -259,8 +258,7 @@ func tick(ticker *time.Ticker, f func(), isEnd func() bool, stop chan bool) {
 				stop <- true
 			}
 			f()
-		case t := <-stop:
-			log.Println(t, "stopped")
+		case <-stop:
 			return
 		}
 	}
