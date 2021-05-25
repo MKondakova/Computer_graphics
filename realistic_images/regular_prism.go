@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"image"
 	"image/draw"
 	_ "image/png"
+	"io/ioutil"
 	"log"
 	"math"
 	"os"
@@ -14,8 +17,27 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
-const SIZE = 1000
+const SIZE = 600
 const HEIGHT = 0.5
+
+type SaveStruct struct {
+	Alpha                   float32
+	LastXpos                float64
+	LastYpos                float64
+	Yaw                     float64
+	Pitch                   float64
+	Scale                   float64
+	SetPolygonMode          bool
+	SetInfinityDistantLight bool
+	AmbientMode             int
+	DiffuseMode             int
+	SpecularMode            int
+
+	IsLightMoving bool
+	T             float64
+	Phase         int
+	TextureMod    int
+}
 
 var (
 	RADIUS  float64 = math.Sqrt(0.5) * 0.5
@@ -247,6 +269,47 @@ func generateTexture() {
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 
 }
+func saveState() {
+
+	file, _ := json.MarshalIndent(SaveStruct{alpha, lastXpos, lastYpos, yaw, pitch, scale, setPolygonMode,
+		setInfinityDistantLight, ambientMode, diffuseMode,
+		specularMode, isLightMoving, t, phase, textureMod}, "", " ")
+
+	_ = ioutil.WriteFile("test.json", file, 0644)
+}
+func loadState() {
+	jsonFile, err := os.Open("test.json")
+	if err != nil {
+		fmt.Println(err)
+	}
+	isLightMoving = false
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	var state SaveStruct
+	json.Unmarshal(byteValue, &state)
+	alpha = state.Alpha
+	lastXpos = state.LastXpos
+	lastYpos = state.LastYpos
+	yaw = state.Yaw
+	pitch = state.Pitch
+	scale = state.Scale
+	setPolygonMode = state.SetPolygonMode
+	setInfinityDistantLight = state.SetInfinityDistantLight
+	ambientMode = state.AmbientMode
+	diffuseMode = state.DiffuseMode
+	specularMode = state.SpecularMode
+	isLightMoving = state.IsLightMoving
+	t = state.T
+	phase = state.Phase
+	textureMod = state.TextureMod
+
+	if isLightMoving {
+		rotateTicker = time.NewTicker(50 * time.Millisecond)
+		rotate(rotateTicker)
+	} else {
+		alpha = 0
+	}
+}
 
 func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 	if action == glfw.Press {
@@ -276,6 +339,12 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 			} else {
 				alpha = 0
 			}
+		}
+		if key == glfw.KeyP {
+			saveState()
+		}
+		if key == glfw.KeyL {
+			loadState()
 		}
 		if key == glfw.KeyMinus {
 			if CORNERS != 3 {
