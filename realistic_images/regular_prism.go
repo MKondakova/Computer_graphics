@@ -1,8 +1,12 @@
 package main
 
 import (
+	"image"
+	"image/draw"
+	_ "image/png"
 	"log"
 	"math"
+	"os"
 	"runtime"
 	"time"
 
@@ -46,6 +50,10 @@ var (
 	POINT1 []float64 = []float64{0, 0.6, 0}
 	POINT2 []float64 = []float64{0.6, 0.6, 0}
 	POINT3 []float64 = []float64{0.6, 0, 0}
+
+	generatedTexture uint32 = 0
+	loadedTexture    uint32 = 0
+	textureMod       int    = 0
 )
 
 func drawBase(vertexes [][2]float64, normals [][3]float64, z float64) {
@@ -65,23 +73,46 @@ func drawBase(vertexes [][2]float64, normals [][3]float64, z float64) {
 
 func drawSideFaces(vertexes [][2]float64, normals [][3]float64, height float64) {
 	for i := 0; i < len(vertexes); i++ {
+		if textureMod == 1 {
+			gl.BindTexture(gl.TEXTURE_2D, generatedTexture)
+			gl.TexEnvi(gl.TEXTURE_ENV, gl.TEXTURE_ENV_MODE, gl.MODULATE)
+		}
+		if textureMod == 2 {
+			gl.BindTexture(gl.TEXTURE_2D, loadedTexture)
+			gl.TexEnvi(gl.TEXTURE_ENV, gl.TEXTURE_ENV_MODE, gl.MODULATE)
+		}
 		gl.Begin(gl.QUADS)
-		gl.Color3d(0.5, 0.2, 0.5)
+		gl.Color4d(1, 1, 1, 1)
+
 		gl.Normal3d(normals[i+len(vertexes)][0], normals[i+len(vertexes)][1], normals[i+len(vertexes)][2])
 		gl.Vertex3d(vertexes[i][0], vertexes[i][1], height/-2)
+		if textureMod > 0 {
+			gl.TexCoord2f(0, 0)
+		}
 
 		gl.Normal3d(normals[i][0], normals[i][1], normals[i][2])
 		gl.Vertex3d(vertexes[i][0], vertexes[i][1], height/2)
+		if textureMod > 0 {
+			gl.TexCoord2f(1, 0)
+		}
 
 		gl.Normal3d(normals[(i+1)%len(vertexes)][0], normals[(i+1)%len(vertexes)][1], normals[(i+1)%len(vertexes)][2])
 		gl.Vertex3d(vertexes[(i+1)%len(vertexes)][0], vertexes[(i+1)%len(vertexes)][1], height/2)
+		if textureMod > 0 {
+			gl.TexCoord2f(1, 1)
+		}
 
 		gl.Normal3d(normals[(i+1)%len(vertexes)+len(vertexes)][0],
 			normals[(i+1)%len(vertexes)+len(vertexes)][1],
 			normals[(i+1)%len(vertexes)+len(vertexes)][2])
 		gl.Vertex3d(vertexes[(i+1)%len(vertexes)][0], vertexes[(i+1)%len(vertexes)][1], height/-2)
+		if textureMod > 0 {
+			gl.TexCoord2f(0, 1)
+		}
 
 		gl.End()
+		gl.BindTexture(gl.TEXTURE_2D, 0)
+
 	}
 
 }
@@ -166,6 +197,57 @@ func setLight() {
 
 }
 
+func loadTexture() {
+	imgFile, err := os.Open("square.png")
+	if err != nil {
+		log.Panicln("texture not found on disk: ", err)
+	}
+	img, _, err := image.Decode(imgFile)
+	if err != nil {
+		log.Panicln("unsupported stride", err)
+	}
+
+	rgba := image.NewRGBA(img.Bounds())
+	if rgba.Stride != rgba.Rect.Size().X*4 {
+		log.Panicln("unsupported stride", err)
+
+	}
+	draw.Draw(rgba, rgba.Bounds(), img, image.Point{0, 0}, draw.Src)
+
+	gl.GenTextures(2, &loadedTexture)
+	gl.ActiveTexture(gl.TEXTURE0)
+	gl.BindTexture(gl.TEXTURE_2D, loadedTexture)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+	gl.TexImage2D(
+		gl.TEXTURE_2D,
+		0,
+		gl.RGBA,
+		int32(rgba.Rect.Size().X),
+		int32(rgba.Rect.Size().Y),
+		0,
+		gl.RGBA,
+		gl.UNSIGNED_BYTE,
+		gl.Ptr(rgba.Pix))
+}
+
+func generateTexture() {
+	data := [2][2][4]uint8{{{255, 0, 0, 0}, {255, 255, 0, 0}}, {{0, 255, 0, 0}, {0, 0, 255, 0}}}
+	gl.GenTextures(1, &generatedTexture)
+	gl.BindTexture(gl.TEXTURE_2D, generatedTexture)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, gl.Ptr(&data[0][0][0]))
+	log.Println(generatedTexture)
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+
+}
+
 func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 	if action == glfw.Press {
 		if key == glfw.KeyI {
@@ -182,6 +264,9 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 		if key == glfw.KeyS {
 			specularMode = (specularMode + 1) % len(specular)
 			log.Println("specular: ", specular[specularMode])
+		}
+		if key == glfw.KeyT {
+			textureMod = (textureMod + 1) % 3
 		}
 		if key == glfw.KeySpace {
 			isLightMoving = !isLightMoving
@@ -303,6 +388,12 @@ func main() {
 	gl.Enable(gl.DEPTH_TEST)
 	gl.Enable(gl.NORMALIZE)
 	gl.Enable(gl.COLOR_MATERIAL)
+	gl.Enable(gl.TEXTURE_2D)
+	generateTexture()
+	defer gl.DeleteTextures(1, &generatedTexture)
+	loadTexture()
+	defer gl.DeleteTextures(2, &loadedTexture)
+
 	gl.Enable(gl.LIGHTING)
 	gl.Enable(gl.LIGHT0)
 
