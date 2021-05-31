@@ -39,6 +39,12 @@ type SaveStruct struct {
 	TextureMod    int
 }
 
+type VertexStruct struct {
+	coords  [3]float64
+	color   [4]float64
+	normals [3]float64
+}
+
 var (
 	RADIUS  float64 = math.Sqrt(0.5) * 0.5
 	CORNERS int     = 6
@@ -76,6 +82,9 @@ var (
 	generatedTexture uint32 = 0
 	loadedTexture    uint32 = 0
 	textureMod       int    = 0
+
+	frames    int       = 0
+	startTime time.Time = time.Now()
 )
 
 func drawBase(vertexes [][2]float64, normals [][3]float64, z float64) {
@@ -83,14 +92,21 @@ func drawBase(vertexes [][2]float64, normals [][3]float64, z float64) {
 	if z < 0 {
 		offset = len(vertexes)
 	}
-	gl.Begin(gl.POLYGON)
 	gl.Color3d(z, 1, 1)
+	vertexArray := make([][3]float64, len(vertexes))
+	normalArray := make([][3]float64, len(vertexes))
 	for i, vertex := range vertexes {
-		gl.Normal3d(normals[offset+i][0], normals[offset+i][1], normals[offset+i][2])
-		gl.Vertex3d(vertex[0], vertex[1], z)
+		normalArray[i] = [3]float64{normals[offset+i][0], normals[offset+i][1], normals[offset+i][2]}
+		vertexArray[i] = [3]float64{vertex[0], vertex[1], z}
 	}
-	gl.Normal3b(0, 0, 0)
-	gl.End()
+
+	gl.EnableClientState(gl.NORMAL_ARRAY)
+	//gl.EnableClientState(gl.VERTEX_ARRAY)
+	gl.VertexPointer(int32(len(vertexArray)), gl.DOUBLE, 0, gl.Ptr(&vertexArray[0][0]))
+	//gl.NormalPointer(gl.DOUBLE, 0, gl.Ptr(&normalArray[0][0]))
+	gl.DrawArrays(gl.POLYGON, 0, int32(len(vertexArray)))
+	//gl.DisableClientState(gl.NORMAL_ARRAY)
+	gl.DisableClientState(gl.VERTEX_ARRAY)
 }
 
 func drawSideFaces(vertexes [][2]float64, normals [][3]float64, height float64) {
@@ -220,7 +236,7 @@ func setLight() {
 }
 
 func loadTexture() {
-	imgFile, err := os.Open("../square.png")
+	imgFile, err := os.Open("../textures/square.png")
 	if err != nil {
 		log.Panicln("texture not found on disk: ", err)
 	}
@@ -479,7 +495,8 @@ func main() {
 		}
 	},
 		func() bool { return false }, make(chan bool, 1))
-
+	startTime = time.Now()
+	frames = 0
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 		gl.LoadIdentity()
@@ -496,7 +513,12 @@ func main() {
 		drawMovingPrism()
 
 		setLight()
-
+		frames++
+		if time.Since(startTime) > time.Second {
+			log.Println(frames, time.Since(startTime))
+			frames = 0
+			startTime = time.Now()
+		}
 		glfw.PollEvents()
 		window.SwapBuffers()
 	}
