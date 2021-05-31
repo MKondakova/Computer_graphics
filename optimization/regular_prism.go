@@ -87,6 +87,11 @@ var (
 	startTime time.Time = time.Now()
 )
 
+func normalize(vec [3]float64) [3]float64 {
+	len := math.Sqrt(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2])
+	return [3]float64{vec[0] / len, vec[1] / len, vec[2] / len}
+}
+
 func drawBase(vertexes [][2]float64, normals [][3]float64, z float64) {
 	offset := 0
 	if z < 0 {
@@ -101,48 +106,94 @@ func drawBase(vertexes [][2]float64, normals [][3]float64, z float64) {
 	}
 
 	gl.EnableClientState(gl.NORMAL_ARRAY)
-	//gl.EnableClientState(gl.VERTEX_ARRAY)
-	gl.VertexPointer(int32(len(vertexArray)), gl.DOUBLE, 0, gl.Ptr(&vertexArray[0][0]))
-	//gl.NormalPointer(gl.DOUBLE, 0, gl.Ptr(&normalArray[0][0]))
+	gl.EnableClientState(gl.VERTEX_ARRAY)
+	gl.VertexPointer(3, gl.DOUBLE, 0, gl.Ptr(&vertexArray[0][0]))
+	gl.NormalPointer(gl.DOUBLE, 0, gl.Ptr(&normalArray[0][0]))
 	gl.DrawArrays(gl.POLYGON, 0, int32(len(vertexArray)))
-	//gl.DisableClientState(gl.NORMAL_ARRAY)
+	gl.DisableClientState(gl.NORMAL_ARRAY)
 	gl.DisableClientState(gl.VERTEX_ARRAY)
 }
 
 func drawSideFaces(vertexes [][2]float64, normals [][3]float64, height float64) {
+	if textureMod == 1 {
+		gl.BindTexture(gl.TEXTURE_2D, generatedTexture)
+		gl.TexEnvi(gl.TEXTURE_ENV, gl.TEXTURE_ENV_MODE, gl.MODULATE)
+	}
+	if textureMod == 2 {
+		gl.BindTexture(gl.TEXTURE_2D, loadedTexture)
+		gl.TexEnvi(gl.TEXTURE_ENV, gl.TEXTURE_ENV_MODE, gl.MODULATE)
+	}
+	vertexArray := [][3]float64{}
+	normalArray := [][3]float64{}
+	gl.Color4d(1, 1, 1, 1)
+	gl.EnableClientState(gl.VERTEX_ARRAY)
+	gl.EnableClientState(gl.NORMAL_ARRAY)
+	if textureMod > 0 {
+		gl.EnableClientState(gl.TEXTURE_2D_ARRAY)
+	}
+
 	for i := 0; i < len(vertexes); i++ {
-		if textureMod == 1 {
-			gl.BindTexture(gl.TEXTURE_2D, generatedTexture)
-			gl.TexEnvi(gl.TEXTURE_ENV, gl.TEXTURE_ENV_MODE, gl.MODULATE)
-		}
-		if textureMod == 2 {
-			gl.BindTexture(gl.TEXTURE_2D, loadedTexture)
-			gl.TexEnvi(gl.TEXTURE_ENV, gl.TEXTURE_ENV_MODE, gl.MODULATE)
-		}
-		gl.Begin(gl.QUADS)
-		gl.Color4d(1, 1, 1, 1)
 
-		gl.Normal3d(normals[i+len(vertexes)][0], normals[i+len(vertexes)][1], normals[i+len(vertexes)][2])
-		gl.Vertex3d(vertexes[i][0], vertexes[i][1], height/-2)
-		if textureMod > 0 {
-			gl.TexCoord2f(0, 0)
-		}
+		normalArray = append(normalArray,
+			[3]float64{normals[i+len(vertexes)][0], normals[i+len(vertexes)][1], normals[i+len(vertexes)][2]})
+		vertexArray = append(vertexArray, [3]float64{vertexes[i][0], vertexes[i][1], height / -2})
 
-		gl.Normal3d(normals[i][0], normals[i][1], normals[i][2])
-		gl.Vertex3d(vertexes[i][0], vertexes[i][1], height/2)
-		if textureMod > 0 {
-			gl.TexCoord2f(1, 0)
-		}
+		normalArray = append(normalArray, [3]float64{normals[i][0], normals[i][1], normals[i][2]})
+		vertexArray = append(vertexArray, [3]float64{vertexes[i][0], vertexes[i][1], height / 2})
 
-		gl.Normal3d(normals[(i+1)%len(vertexes)][0], normals[(i+1)%len(vertexes)][1], normals[(i+1)%len(vertexes)][2])
-		gl.Vertex3d(vertexes[(i+1)%len(vertexes)][0], vertexes[(i+1)%len(vertexes)][1], height/2)
-		if textureMod > 0 {
-			gl.TexCoord2f(1, 1)
-		}
+		normalArray = append(normalArray, [3]float64{normals[(i+1)%len(vertexes)][0], normals[(i+1)%len(vertexes)][1], normals[(i+1)%len(vertexes)][2]})
+		vertexArray = append(vertexArray, [3]float64{vertexes[(i+1)%len(vertexes)][0], vertexes[(i+1)%len(vertexes)][1], height / 2})
 
-		gl.Normal3d(normals[(i+1)%len(vertexes)+len(vertexes)][0],
+		normalArray = append(normalArray, [3]float64{normals[(i+1)%len(vertexes)+len(vertexes)][0],
 			normals[(i+1)%len(vertexes)+len(vertexes)][1],
-			normals[(i+1)%len(vertexes)+len(vertexes)][2])
+			normals[(i+1)%len(vertexes)+len(vertexes)][2]})
+		vertexArray = append(vertexArray, [3]float64{vertexes[(i+1)%len(vertexes)][0], vertexes[(i+1)%len(vertexes)][1], height / -2})
+	}
+	gl.VertexPointer(3, gl.DOUBLE, 0, gl.Ptr(&vertexArray[0][0]))
+	gl.NormalPointer(gl.DOUBLE, 0, gl.Ptr(&normalArray[0][0]))
+	gl.DrawArrays(gl.QUADS, 0, int32(len(vertexArray)))
+	gl.DisableClientState(gl.NORMAL_ARRAY)
+	gl.DisableClientState(gl.VERTEX_ARRAY)
+
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+
+}
+
+///////////////////////////////////////////////////////////
+/*func drawSideFaces(vertexes [][2]float64, normals [][3]float64, height float64) {
+for i := 0; i < len(vertexes); i++ {
+	if textureMod == 1 {
+		gl.BindTexture(gl.TEXTURE_2D, generatedTexture)
+		gl.TexEnvi(gl.TEXTURE_ENV, gl.TEXTURE_ENV_MODE, gl.MODULATE)
+	}
+	if textureMod == 2 {
+		gl.BindTexture(gl.TEXTURE_2D, loadedTexture)
+		gl.TexEnvi(gl.TEXTURE_ENV, gl.TEXTURE_ENV_MODE, gl.MODULATE)
+	}
+	gl.Begin(gl.QUADS)
+	gl.Color4d(1, 1, 1, 1)
+
+	gl.Normal3d(normals[i+len(vertexes)][0], normals[i+len(vertexes)][1], normals[i+len(vertexes)][2])
+	gl.Vertex3d(vertexes[i][0], vertexes[i][1], height/-2)
+	if textureMod > 0 {
+		gl.TexCoord2f(0, 0)
+	}
+
+	gl.Normal3d(normals[i][0], normals[i][1], normals[i][2])
+	gl.Vertex3d(vertexes[i][0], vertexes[i][1], height/2)
+	if textureMod > 0 {
+		gl.TexCoord2f(1, 0)
+	}
+
+	gl.Normal3d(normals[(i+1)%len(vertexes)][0], normals[(i+1)%len(vertexes)][1], normals[(i+1)%len(vertexes)][2])
+	gl.Vertex3d(vertexes[(i+1)%len(vertexes)][0], vertexes[(i+1)%len(vertexes)][1], height/2)
+	if textureMod > 0 {
+		gl.TexCoord2f(1, 1)
+	}
+
+	gl.Normal3d(normals[(i+1)%len(vertexes)+len(vertexes)][0],
+		normals[(i+1)%len(vertexes)+len(vertexes)][1],
+		normals[(i+1)%len(vertexes)+len(vertexes)][2])
 		gl.Vertex3d(vertexes[(i+1)%len(vertexes)][0], vertexes[(i+1)%len(vertexes)][1], height/-2)
 		if textureMod > 0 {
 			gl.TexCoord2f(0, 1)
@@ -153,8 +204,23 @@ func drawSideFaces(vertexes [][2]float64, normals [][3]float64, height float64) 
 
 	}
 
-}
-
+	}
+	func drawBase(vertexes [][2]float64, normals [][3]float64, z float64) {
+		offset := 0
+		if z < 0 {
+			offset = len(vertexes)
+		}
+		gl.Begin(gl.POLYGON)
+		gl.Color3d(z, 1, 1)
+		for i, vertex := range vertexes {
+			gl.Normal3d(normals[offset+i][0], normals[offset+i][1], normals[offset+i][2])
+			gl.Vertex3d(vertex[0], vertex[1], z)
+		}
+		gl.Normal3b(0, 0, 0)
+		gl.End()
+	}
+*/
+////////////////////////////////////////////////////////////////////////////////////////////////
 func drawPrism(n int) {
 	vertexes := [][2]float64{}
 	normals := make([][3]float64, n*2)
@@ -171,6 +237,9 @@ func drawPrism(n int) {
 		normals[n+i][0] = normals[i][0]
 		normals[n+i][1] = normals[i][1]
 		normals[n+i][2] = HEIGHT / -2
+
+		normals[i] = normalize(normals[i])
+		normals[n+i] = normalize(normals[n+i])
 	}
 	drawBase(vertexes, normals, HEIGHT/-2)
 	drawBase(vertexes, normals, HEIGHT/2)
@@ -437,7 +506,8 @@ func tick(ticker *time.Ticker, f func(), isEnd func() bool, stop chan bool) {
 func initWindow() *glfw.Window {
 	glfw.WindowHint(glfw.Resizable, glfw.False)
 	glfw.WindowHint(glfw.ContextVersionMajor, 2)
-	glfw.WindowHint(glfw.ContextVersionMinor, 0)
+	glfw.WindowHint(glfw.ContextVersionMinor, 1)
+	glfw.WindowHint(glfw.DoubleBuffer, glfw.False)
 	window, err := glfw.CreateWindow(SIZE, SIZE, "LAB_6", nil, nil)
 	if err != nil {
 		panic(err)
@@ -471,7 +541,11 @@ func main() {
 	window.SetMouseButtonCallback(glfw.MouseButtonCallback(mouseCallback))
 
 	gl.Enable(gl.DEPTH_TEST)
+
+	//gl.ShadeModel(gl.FLAT) //[x]
+
 	gl.Enable(gl.NORMALIZE)
+	//gl.Disable(gl.NORMALIZE)
 	gl.Enable(gl.COLOR_MATERIAL)
 	gl.Enable(gl.TEXTURE_2D)
 	generateTexture()
@@ -520,7 +594,8 @@ func main() {
 			startTime = time.Now()
 		}
 		glfw.PollEvents()
-		window.SwapBuffers()
+		//window.SwapBuffers()
+		gl.Flush()
 	}
 
 }

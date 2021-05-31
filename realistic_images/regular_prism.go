@@ -220,7 +220,7 @@ func setLight() {
 }
 
 func loadTexture() {
-	imgFile, err := os.Open("../square.png")
+	imgFile, err := os.Open("../textures/square.png")
 	if err != nil {
 		log.Panicln("texture not found on disk: ", err)
 	}
@@ -479,7 +479,8 @@ func main() {
 		}
 	},
 		func() bool { return false }, make(chan bool, 1))
-
+	frames := 0
+	startTime := time.Now()
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 		gl.LoadIdentity()
@@ -496,6 +497,12 @@ func main() {
 		drawMovingPrism()
 
 		setLight()
+		frames++
+		if time.Since(startTime) > time.Second {
+			log.Println(frames, time.Since(startTime))
+			frames = 0
+			startTime = time.Now()
+		}
 
 		glfw.PollEvents()
 		window.SwapBuffers()
