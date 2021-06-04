@@ -125,11 +125,12 @@ func drawSideFaces(vertexes [][2]float64, normals [][3]float64, height float64) 
 	}
 	vertexArray := [][3]float64{}
 	normalArray := [][3]float64{}
+	textureArray := [][2]float64{}
 	gl.Color4d(1, 1, 1, 1)
 	gl.EnableClientState(gl.VERTEX_ARRAY)
 	gl.EnableClientState(gl.NORMAL_ARRAY)
 	if textureMod > 0 {
-		gl.EnableClientState(gl.TEXTURE_2D_ARRAY)
+		gl.EnableClientState(gl.TEXTURE_COORD_ARRAY)
 	}
 
 	for i := 0; i < len(vertexes); i++ {
@@ -148,12 +149,16 @@ func drawSideFaces(vertexes [][2]float64, normals [][3]float64, height float64) 
 			normals[(i+1)%len(vertexes)+len(vertexes)][1],
 			normals[(i+1)%len(vertexes)+len(vertexes)][2]})
 		vertexArray = append(vertexArray, [3]float64{vertexes[(i+1)%len(vertexes)][0], vertexes[(i+1)%len(vertexes)][1], height / -2})
+
+		textureArray = append(textureArray, [2]float64{0, 0}, [2]float64{1, 0}, [2]float64{1, 1}, [2]float64{0, 1})
 	}
+	gl.TexCoordPointer(2, gl.DOUBLE, 0, gl.Ptr(&textureArray[0][0]))
 	gl.VertexPointer(3, gl.DOUBLE, 0, gl.Ptr(&vertexArray[0][0]))
 	gl.NormalPointer(gl.DOUBLE, 0, gl.Ptr(&normalArray[0][0]))
 	gl.DrawArrays(gl.QUADS, 0, int32(len(vertexArray)))
 	gl.DisableClientState(gl.NORMAL_ARRAY)
 	gl.DisableClientState(gl.VERTEX_ARRAY)
+	gl.DisableClientState(gl.TEXTURE_COORD_ARRAY)
 
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 
