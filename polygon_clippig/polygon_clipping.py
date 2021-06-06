@@ -282,11 +282,12 @@ def display():
             segments = clipping(clipper_segments, segments, False)
         else:
             local_points = clipper_points.copy()
-            segments = clipping(points_to_polygon(complete_polygon(local_points)), segments, True)
+            outter_segments = clipping(points_to_polygon(complete_polygon(local_points)), segments, False)
             additional_clippers = []
             for clipper in additional_points:
                 additional_clippers.append(points_to_polygon(clipper))
-                segments = clipping(points_to_polygon(clipper), segments, False)
+                outter_segments.extend( clipping(points_to_polygon(clipper), segments, True))
+            segments = outter_segments
 
     draw()
     glFlush()
